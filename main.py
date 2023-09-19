@@ -151,15 +151,28 @@ class QLearning:
             print(count, ": ", str(sum(steps) / 10))
             count += 10
 
+        x = range(0, 1000)
+        y = self.rewards_all_episodes
+        avg_range = 50
+        avg_rewards = []
+        for i in range(len(y) - avg_range + 1):
+            avg_rewards.append(np.mean(y[i: i + avg_range]))
+        for i in range(avg_range - 1):
+            avg_rewards.insert(0, np.nan)
+
+        fig, ax = plt.subplots()
+        ax.plot(x, avg_rewards)
+        plt.show()
+
         return
 
 
 class QLearningBountyHunter(QLearning):
     def __init__(self, action_space):
         super().__init__(action_space)
-        self.learning_rate = 0.5
-        self.discount_factor = 0.8
-        self.exploration_rate = 0.05
+        self.learning_rate = 0.8
+        self.discount_factor = 0.9
+        self.exploration_rate = 0.1
 
         for terminal_state in self.terminal_states:
             self.r_table[terminal_state] = 0
@@ -177,12 +190,10 @@ class QLearningBountyHunter(QLearning):
 
 
 if __name__ == '__main__':
-    # a = QLearning(4)
-    # a.learn()
-    # a.stats()
+    a = QLearning(4)
+    a.learn()
+    a.stats()
 
-    b = QLearningBountyHunter(5)
-    b.learn()
-    b.stats()
-
-
+    # b = QLearningBountyHunter(5)
+    # b.learn()
+    # b.stats()
