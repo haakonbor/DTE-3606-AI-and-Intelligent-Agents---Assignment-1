@@ -19,7 +19,7 @@ class Action(IntEnum):
 class QLearning:
     def __init__(self, action_space):
         # Hyper parameters
-        self.learning_rate = 0.9
+        self.learning_rate = 0.8
         self.discount_factor = 0.8
         self.exploration_rate = 0.1
         self.episodes = 1000
@@ -136,24 +136,24 @@ class QLearning:
                 col_index = 0
                 row_index += 1
         print(max_q)
-
-        rewards_per_10_ep = np.split(np.array(self.rewards_all_episodes), int(self.episodes / 10))
-        print("----- AVG REWARD PER 10 EPISODE ------\n")
-        count = 10
-        for rewards in rewards_per_10_ep:
-            print(count, ": ", str(sum(rewards)/10))
-            count += 10
-
-        steps_per_10_ep = np.split(np.array(self.steps_all_episodes), int(self.episodes / 10))
-        print("----- AVG STEPS PER 10 EPISODE ------\n")
-        count = 10
-        for steps in steps_per_10_ep:
-            print(count, ": ", str(sum(steps) / 10))
-            count += 10
+        #
+        # rewards_per_10_ep = np.split(np.array(self.rewards_all_episodes), int(self.episodes / 10))
+        # print("----- AVG REWARD PER 10 EPISODE ------\n")
+        # count = 10
+        # for rewards in rewards_per_10_ep:
+        #     print(count, ": ", str(sum(rewards)/10))
+        #     count += 10
+        #
+        # steps_per_10_ep = np.split(np.array(self.steps_all_episodes), int(self.episodes / 10))
+        # print("----- AVG STEPS PER 10 EPISODE ------\n")
+        # count = 10
+        # for steps in steps_per_10_ep:
+        #     print(count, ": ", str(sum(steps) / 10))
+        #     count += 10
 
         x = range(0, 1000)
         y = self.rewards_all_episodes
-        avg_range = 50
+        avg_range = 100
         avg_rewards = []
         for i in range(len(y) - avg_range + 1):
             avg_rewards.append(np.mean(y[i: i + avg_range]))
@@ -162,6 +162,9 @@ class QLearning:
 
         fig, ax = plt.subplots()
         ax.plot(x, avg_rewards)
+        ax.set_xlabel('Episodes')
+        ax.set_ylabel('Score')
+        ax.set_title(f'Running average score (window = {avg_range})')
         plt.show()
 
         return
@@ -171,7 +174,7 @@ class QLearningBountyHunter(QLearning):
     def __init__(self, action_space):
         super().__init__(action_space)
         self.learning_rate = 0.8
-        self.discount_factor = 0.9
+        self.discount_factor = 0.8
         self.exploration_rate = 0.1
 
         for terminal_state in self.terminal_states:
@@ -190,10 +193,10 @@ class QLearningBountyHunter(QLearning):
 
 
 if __name__ == '__main__':
-    a = QLearning(4)
-    a.learn()
-    a.stats()
+    # a = QLearning(4)
+    # a.learn()
+    # a.stats()
 
-    # b = QLearningBountyHunter(5)
-    # b.learn()
-    # b.stats()
+    b = QLearningBountyHunter(5)
+    b.learn()
+    b.stats()
