@@ -85,7 +85,7 @@ class QLearning:
 
     def learn(self):
         for episode in range(self.episodes):
-            # Start in a random state in either row A or I, and before column 4.
+            # Start in a random state in either row "A" or "I", and before column 4.
             state = [random.choice([0, 9]), 0]
 
             rewards_curr_episode = []
@@ -206,10 +206,17 @@ class QLearningBountyHunter(QLearning):
 
 
 if __name__ == '__main__':
-    a = QLearning(4)
-    a.learn()
-    a.stats()
+    subtask = input("Choose subtask (a, b, c, ...): ")
 
-    # b = QLearningBountyHunter(5)
-    # b.learn()
-    # b.stats()
+    if subtask == "a":
+        a = QLearning(4)
+        a.learn()
+        a.stats()
+
+    elif subtask == "b":
+        b = QLearningBountyHunter(5)
+        b.learn()
+        b.stats()
+
+    else:
+        print("Subtask not implemented yet or invalid input")
