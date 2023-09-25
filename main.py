@@ -88,8 +88,11 @@ class QLearning:
             # Start in a random state in either row A or I, and before column 4.
             state = [random.choice([0, 9]), 0]
 
-            rewards_curr_episode = 0
+            rewards_curr_episode = []
             steps_curr_episode = 0
+
+            actions_made = []
+            states_visited = []
 
             while not self.in_terminal_state(state):
                 q_index = state[0] * 10 + state[1]
@@ -104,9 +107,12 @@ class QLearning:
                 if new_state == state and self.action_space == 4:
                     continue
 
+                actions_made.append(action)
+                states_visited.append(state)
+
                 movement_cost = 0 if action == Action.WAIT else -5
                 reward = self.r_table[new_state[0], new_state[1]] + movement_cost
-                rewards_curr_episode += reward
+                rewards_curr_episode.append(reward)
                 steps_curr_episode += movement_cost / -5
 
                 prev_q = self.q_table[q_index, action]
@@ -118,7 +124,8 @@ class QLearning:
                 self.q_table[q_index, action] = q
                 state = new_state
 
-            self.rewards_all_episodes.append(rewards_curr_episode)
+            sum_rewards_curr_episode = np.sum(rewards_curr_episode)
+            self.rewards_all_episodes.append(sum_rewards_curr_episode)
             self.steps_all_episodes.append(steps_curr_episode)
 
     def stats(self):
@@ -151,7 +158,7 @@ class QLearning:
         #     print(count, ": ", str(sum(steps) / 10))
         #     count += 10
 
-        x = range(0, 1000)
+        x = range(0, self.episodes)
         y = self.rewards_all_episodes
         avg_range = 100
         avg_rewards = []
@@ -179,24 +186,30 @@ class QLearningBountyHunter(QLearning):
 
         for terminal_state in self.terminal_states:
             self.r_table[terminal_state] = 0
-        self.hideouts = np.array([[5, 1], [6, 8]])
+        self.hideouts = [[5, 1], [6, 8]]
         self.hideouts_prob = [0.25, 0.75]
         self.thief_pos = self.hideouts[0]
         self.r_table[self.thief_pos[0], self.thief_pos[1]] = 1000
+        self.terminal_states.append(self.thief_pos)
 
-    def in_terminal_state(self, state):
+    def transition(self, state, action):
+        new_state = super().transition(state, action)
+
         for hideout in self.hideouts:
             self.r_table[hideout] = 0
+
         self.thief_pos = self.hideouts[np.random.choice(len(self.hideouts), p=self.hideouts_prob)]
         self.r_table[self.thief_pos[0], self.thief_pos[1]] = 1000
-        return np.array_equal(state, self.thief_pos)
+        self.terminal_states[0] = self.thief_pos
+
+        return new_state
 
 
 if __name__ == '__main__':
-    # a = QLearning(4)
-    # a.learn()
-    # a.stats()
+    a = QLearning(4)
+    a.learn()
+    a.stats()
 
-    b = QLearningBountyHunter(5)
-    b.learn()
-    b.stats()
+    # b = QLearningBountyHunter(5)
+    # b.learn()
+    # b.stats()
