@@ -129,9 +129,6 @@ class QLearning:
             self.steps_all_episodes.append(steps_curr_episode)
 
     def stats(self):
-        # print("----- UPDATED Q-TABLE ------\n")
-        # print(q_table)
-
         print("----- MAX Q ------\n")
         max_q = np.zeros((10, 10))
         row_index = 0
@@ -143,24 +140,10 @@ class QLearning:
                 col_index = 0
                 row_index += 1
         print(max_q)
-        #
-        # rewards_per_10_ep = np.split(np.array(self.rewards_all_episodes), int(self.episodes / 10))
-        # print("----- AVG REWARD PER 10 EPISODE ------\n")
-        # count = 10
-        # for rewards in rewards_per_10_ep:
-        #     print(count, ": ", str(sum(rewards)/10))
-        #     count += 10
-        #
-        # steps_per_10_ep = np.split(np.array(self.steps_all_episodes), int(self.episodes / 10))
-        # print("----- AVG STEPS PER 10 EPISODE ------\n")
-        # count = 10
-        # for steps in steps_per_10_ep:
-        #     print(count, ": ", str(sum(steps) / 10))
-        #     count += 10
 
         x = range(0, self.episodes)
         y = self.rewards_all_episodes
-        avg_range = 100
+        avg_range = 10
         avg_rewards = []
         for i in range(len(y) - avg_range + 1):
             avg_rewards.append(np.mean(y[i: i + avg_range]))
@@ -183,7 +166,6 @@ class QLearningBountyHunter(QLearning):
         self.learning_rate = 0.8
         self.discount_factor = 0.8
         self.exploration_rate = 0.1
-
         for terminal_state in self.terminal_states:
             self.r_table[terminal_state] = 0
         self.hideouts = [[5, 1], [6, 8]]
@@ -192,16 +174,94 @@ class QLearningBountyHunter(QLearning):
         self.r_table[self.thief_pos[0], self.thief_pos[1]] = 1000
         self.terminal_states.append(self.thief_pos)
 
-    def transition(self, state, action):
-        new_state = super().transition(state, action)
-
+    def move_thief(self):
         for hideout in self.hideouts:
             self.r_table[hideout] = 0
 
+        # Thief picks to move or not with given probability
         self.thief_pos = self.hideouts[np.random.choice(len(self.hideouts), p=self.hideouts_prob)]
+
         self.r_table[self.thief_pos[0], self.thief_pos[1]] = 1000
         self.terminal_states[0] = self.thief_pos
 
+    def transition(self, state, action):
+        new_state = super().transition(state, action)
+        self.move_thief()
+        return new_state
+
+
+class QLearningBountyHunterWithAssistant(QLearningBountyHunter):
+    def __init__(self, action_space):
+        super().__init__(action_space)
+        self.thief_moved = False
+
+    def learn(self):
+        for episode in range(self.episodes):
+            states = [[0, 0], [9, 0]]
+            rewards_curr_episode = []
+            steps_curr_episode = [0, 0]
+            actions_made = [[], []]
+            states_visited = [[], []]
+
+            while not self.in_terminal_state(states[0]) and not self.in_terminal_state(states[1]):
+                self.thief_moved = False
+                q_indexes = [states[0][0] * 10 + states[0][1], states[1][0] * 10 + states[1][1]]
+                actions = [self.policy(q_indexes[0]), self.policy(q_indexes[1])]
+                new_states = [self.transition(states[0], actions[0]), self.transition(states[1], actions[1])]
+                new_q_indexes = [new_states[0][0] * 10 + new_states[0][1], new_states[1][0] * 10 + new_states[1][1]]
+
+                """ BOUNTY HUNTER """
+                # Bounty hunter is trying to move into state of assistant who is standing still
+                if new_states[0] == new_states[1] and actions[1] == Action.WAIT:
+                    continue
+
+                actions_made[0].append(actions[0])
+                states_visited[0].append(states[0])
+
+                movement_cost = 0 if actions[0] == Action.WAIT else -5
+                reward = self.r_table[new_states[0][0], new_states[0][1]] + movement_cost
+                rewards_curr_episode.append(reward)
+                steps_curr_episode[0] += movement_cost / -5
+
+                prev_q = self.q_table[q_indexes[0], actions[0]]
+
+                q = prev_q + self.learning_rate * \
+                    (reward + self.discount_factor * max(self.q_table[new_q_indexes[0]]) - prev_q)
+                self.q_table[q_indexes[0], actions[0]] = q
+                states[0] = new_states[0]
+
+                """ ASSISTANT """
+                # Assistant is trying to move into state of the bounty hunter
+                if new_states[1] == states[0]:
+                    # Make the assistant wait while the bounty hunter is moving into the suggested new state
+                    new_states[1] = states[1]
+                    actions[1] = Action.WAIT
+                    new_q_indexes[1] = new_states[1][0] * 10 + new_states[1][1]
+
+                actions_made[1].append(actions[1])
+                states_visited[1].append(states[1])
+
+                movement_cost = 0 if actions[1] == Action.WAIT else -5
+                reward = self.r_table[new_states[1][0], new_states[1][1]] + movement_cost
+                rewards_curr_episode.append(reward)
+                steps_curr_episode[1] += movement_cost / -5
+
+                prev_q = self.q_table[q_indexes[1], actions[1]]
+
+                q = prev_q + self.learning_rate * \
+                    (reward + self.discount_factor * max(self.q_table[new_q_indexes[1]]) - prev_q)
+                self.q_table[q_indexes[1], actions[1]] = q
+                states[1] = new_states[1]
+
+            sum_rewards_curr_episode = np.sum(rewards_curr_episode)
+            self.rewards_all_episodes.append(sum_rewards_curr_episode)
+            self.steps_all_episodes.append(steps_curr_episode)
+
+    def transition(self, state, action):
+        new_state = QLearning.transition(self, state, action)
+        if not self.thief_moved:
+            self.move_thief()
+            self.thief_moved = True
         return new_state
 
 
@@ -217,6 +277,12 @@ if __name__ == '__main__':
         b = QLearningBountyHunter(5)
         b.learn()
         b.stats()
+
+    elif subtask == "c":
+        c = QLearningBountyHunterWithAssistant(5)
+        c.learn()
+        c.stats()
+        pass
 
     else:
         print("Subtask not implemented yet or invalid input")
