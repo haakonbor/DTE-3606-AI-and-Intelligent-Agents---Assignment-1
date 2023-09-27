@@ -205,12 +205,13 @@ class QLearningBountyHunter(QLearning):
         self.exploration_rate = 0.1
         for terminal_state in self.terminal_states:
             self.r_table[terminal_state] = 0
+        self.terminal_states.clear()
         self.hideouts = [[5, 1], [6, 8]]
         self.hideouts_prob = [0.35, 0.65]
-        for i in range(len(self.hideouts)):
-            self.r_table[self.hideouts[i][0], self.hideouts[i][1]] = 1000
-            self.reward_prob[self.hideouts[i][0], self.hideouts[i][1]] = self.hideouts_prob[i]
         self.thief_pos = self.hideouts[0]
+        self.r_table[self.thief_pos[0], self.thief_pos[1]] = 1000
+        self.reward_prob[self.hideouts[0][0], self.hideouts[0][1]] = self.hideouts_prob[0]
+        self.reward_prob[self.hideouts[1][0], self.hideouts[1][1]] = self.hideouts_prob[1]
         self.terminal_states.append(self.thief_pos)
 
     def move_thief(self):
