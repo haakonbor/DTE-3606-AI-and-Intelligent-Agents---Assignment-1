@@ -23,7 +23,7 @@ class QLearning:
         self.discount_factor = 0.8
         self.exploration_rate = 0.1
         self.episodes = 1000
-        self.max_steps = 500
+        self.max_steps = 1000
 
         # State info
         self.terminal_states = [[0, 8], [5, 9], [8, 6]]
@@ -52,9 +52,12 @@ class QLearning:
         self.r_table[8][6] -= 100
         self.reward_prob[8][6] = 1
 
-        self.rewards = np.zeros(self.episodes)
+        self.score = np.zeros(self.episodes)
         self.steps = np.zeros(self.episodes)
         self.abs_td_error = np.zeros(self.episodes)
+
+        self.fig, self.axs = plt.subplots(3)
+        self.x = range(0, self.episodes)
 
     def policy(self, q_index):
         random_num = random.uniform(0, 1)
@@ -92,9 +95,6 @@ class QLearning:
     def in_terminal_state(self, state):
         return state in self.terminal_states
 
-    def reward_func(self, new_state, movement_cost):
-        return self.r_table[new_state[0], new_state[1]] + movement_cost
-
     def learn(self):
         for episode in range(self.episodes):
             state = [0, 0]
@@ -119,19 +119,59 @@ class QLearning:
                 states_visited.append(state)
 
                 movement_cost = 0 if action == Action.WAIT else -5
-                reward = self.reward_func(new_state, movement_cost)
+                reward = self.r_table[new_state[0], new_state[1]]
                 reward_prob = self.reward_prob[new_state[0], new_state[1]]
-                self.rewards[episode] += reward
+                self.score[episode] += reward + movement_cost
                 self.steps[episode] += movement_cost / -5
 
                 prev_q = self.q_table[q_index, action]
 
                 # Q-learning algorithm
-                td_error = reward_prob * reward + self.discount_factor * max(self.q_table[new_q_index]) - prev_q
+                td_error = (reward_prob * reward + movement_cost + self.discount_factor
+                            * max(self.q_table[new_q_index]) - prev_q)
                 self.abs_td_error[episode] += abs(td_error)
                 q = prev_q + self.learning_rate * td_error
                 self.q_table[q_index, action] = q
                 state = new_state
+
+    def plot_rewards(self):
+        y = self.score
+        avg_range = 10
+        avg_rewards = []
+        for i in range(len(y) - avg_range + 1):
+            avg_rewards.append(np.mean(y[i: i + avg_range]))
+        for i in range(avg_range - 1):
+            avg_rewards.insert(0, np.nan)
+        self.axs[0].plot(self.x, avg_rewards)
+        self.axs[0].set_xlabel('Episodes')
+        self.axs[0].set_ylabel('Score')
+        self.axs[0].set_title(f'Running average score (window = {avg_range})')
+
+    def plot_steps(self):
+        y = self.steps
+        avg_range = 10
+        avg_steps = []
+        for i in range(len(y) - avg_range + 1):
+            avg_steps.append(np.mean(y[i: i + avg_range]))
+        for i in range(avg_range - 1):
+            avg_steps.insert(0, np.nan)
+        self.axs[1].plot(self.x, avg_steps)
+        self.axs[1].set_xlabel('Episodes')
+        self.axs[1].set_ylabel('Steps')
+        self.axs[1].set_title(f'Running average steps (window = {avg_range})')
+
+    def plot_abs_td_errors(self):
+        y = self.abs_td_error
+        avg_range = 10
+        avg_error = []
+        for i in range(len(y) - avg_range + 1):
+            avg_error.append(np.mean(y[i: i + avg_range]))
+        for i in range(avg_range - 1):
+            avg_error.insert(0, np.nan)
+        self.axs[2].plot(self.x, avg_error)
+        self.axs[2].set_xlabel('Episodes')
+        self.axs[2].set_ylabel('Error')
+        self.axs[2].set_title(f'Running average absolute TD error (window = {avg_range})')
 
     def stats(self):
         print("----- MAX Q ------")
@@ -146,46 +186,11 @@ class QLearning:
                 row_index += 1
         print(max_q)
 
-        fig, axs = plt.subplots(3)
-        x = range(0, self.episodes)
+        self.plot_rewards()
+        self.plot_steps()
+        self.plot_abs_td_errors()
 
-        y = self.rewards
-        avg_range = 10
-        avg_rewards = []
-        for i in range(len(y) - avg_range + 1):
-            avg_rewards.append(np.mean(y[i: i + avg_range]))
-        for i in range(avg_range - 1):
-            avg_rewards.insert(0, np.nan)
-        axs[0].plot(x, avg_rewards)
-        axs[0].set_xlabel('Episodes')
-        axs[0].set_ylabel('Score')
-        axs[0].set_title(f'Running average score (window = {avg_range})')
-
-        y = self.steps
-        avg_range = 10
-        avg_steps = []
-        for i in range(len(y) - avg_range + 1):
-            avg_steps.append(np.mean(y[i: i + avg_range]))
-        for i in range(avg_range - 1):
-            avg_steps.insert(0, np.nan)
-        axs[1].plot(x, avg_steps)
-        axs[1].set_xlabel('Episodes')
-        axs[1].set_ylabel('Steps')
-        axs[1].set_title(f'Running average steps (window = {avg_range})')
-
-        y = self.abs_td_error
-        avg_range = 10
-        avg_error = []
-        for i in range(len(y) - avg_range + 1):
-            avg_error.append(np.mean(y[i: i + avg_range]))
-        for i in range(avg_range - 1):
-            avg_error.insert(0, np.nan)
-        axs[2].plot(x, avg_error)
-        axs[2].set_xlabel('Episodes')
-        axs[2].set_ylabel('Error')
-        axs[2].set_title(f'Running average absolute TD error (window = {avg_range})')
-
-        fig.set_size_inches(8, 8)
+        self.fig.set_size_inches(8, 8)
         plt.subplots_adjust(hspace=0.5)
         plt.show()
 
@@ -250,17 +255,18 @@ class QLearningBountyHunterWithAssistant(QLearningBountyHunter):
                 states_visited[0].append(states[0])
 
                 movement_cost = 0 if actions[0] == Action.WAIT else -5
-                reward = self.reward_func(new_states[0], movement_cost)
+                reward = self.r_table[new_states[0][0], new_states[0][1]]
                 reward_prob = self.reward_prob[new_states[0][0], new_states[0][1]]
-                self.rewards[episode] += reward
+                self.score[episode] += reward + movement_cost
                 self.steps[episode][0] += movement_cost / -5
 
                 prev_q = self.q_table[q_indexes[0], actions[0]]
-
-                td_error = reward_prob * reward + self.discount_factor * max(self.q_table[new_q_indexes[0]]) - prev_q
+                td_error = (reward_prob * reward + movement_cost + self.discount_factor
+                            * max(self.q_table[new_q_indexes[0]]) - prev_q)
                 self.abs_td_error[episode] += abs(td_error)
                 q = prev_q + self.learning_rate * td_error
                 self.q_table[q_indexes[0], actions[0]] = q
+
                 states[0] = new_states[0]
 
                 """ ASSISTANT """
@@ -275,17 +281,18 @@ class QLearningBountyHunterWithAssistant(QLearningBountyHunter):
                 states_visited[1].append(states[1])
 
                 movement_cost = 0 if actions[1] == Action.WAIT else -5
-                reward = self.reward_func(new_states[1], movement_cost)
+                reward = self.r_table[new_states[1][0], new_states[1][1]]
                 reward_prob = self.reward_prob[new_states[1][0], new_states[1][1]]
-                self.rewards[episode] += reward
+                self.score[episode] += reward + movement_cost
                 self.steps[episode][1] += movement_cost / -5
 
                 prev_q = self.q_table[q_indexes[1], actions[1]]
-
-                td_error = reward_prob * reward + self.discount_factor * max(self.q_table[new_q_indexes[1]]) - prev_q
+                td_error = (reward_prob * reward + movement_cost + self.discount_factor
+                            * max(self.q_table[new_q_indexes[1]]) - prev_q)
                 self.abs_td_error[episode] += abs(td_error)
                 q = prev_q + self.learning_rate * td_error
                 self.q_table[q_indexes[1], actions[1]] = q
+
                 states[1] = new_states[1]
 
     def transition(self, state, action):
