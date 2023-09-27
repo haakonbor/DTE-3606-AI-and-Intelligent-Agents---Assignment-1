@@ -4,7 +4,8 @@ import time
 import matplotlib.pyplot as plt
 from enum import IntEnum
 
-np.random.seed(int(time.time()))
+# np.random.seed(int(time.time()))
+np.random.seed(0)
 np.set_printoptions(precision=1)
 
 
@@ -21,17 +22,19 @@ class QLearning:
         # Hyper parameters
         self.learning_rate = 0.8
         self.discount_factor = 0.8
-        self.exploration_rate = 0.1
+        self.exploration_rate = 0.3
         self.episodes = 1000
         self.max_steps = 1000
 
         # State info
-        self.terminal_states = [[0, 8], [5, 9], [8, 6]]
+        self.terminal_states = [[5, 9], [0, 8], [8, 6]]
         self.blocked_states = [[1, 2], [2, 2], [3, 2], [4, 2], [3, 6], [4, 6], [5, 6], [6, 6], [5, 7], [6, 7]]
 
         # Dimensions
         self.state_space = 100
         self.action_space = action_space
+
+        self.state_action_visits = np.zeros((self.state_space, self.action_space))
 
         # R-matrix and Q-table
         self.r_table = np.zeros((10, 10))
@@ -60,7 +63,7 @@ class QLearning:
         self.x = range(0, self.episodes)
 
     def policy(self, q_index):
-        random_num = random.uniform(0, 1)
+        random_num = np.random.uniform(0, 1)
 
         # Exploitation
         if random_num > self.exploration_rate:
@@ -92,6 +95,13 @@ class QLearning:
 
         return new_state
 
+    @staticmethod
+    def get_q_index(state):
+        return state[0] * 10 + state[1]
+
+    def get_learning_rate(self, state=None, action=None):
+        return self.learning_rate
+
     def in_terminal_state(self, state):
         return state in self.terminal_states
 
@@ -103,7 +113,7 @@ class QLearning:
             states_visited = []
 
             while not self.in_terminal_state(state) and self.steps[episode] < self.max_steps:
-                q_index = state[0] * 10 + state[1]
+                q_index = self.get_q_index(state)
 
                 # Action chosen using epsilon-greedy policy
                 action = self.policy(q_index)
@@ -130,8 +140,10 @@ class QLearning:
                 td_error = (reward_prob * reward + movement_cost + self.discount_factor
                             * max(self.q_table[new_q_index]) - prev_q)
                 self.abs_td_error[episode] += abs(td_error)
-                q = prev_q + self.learning_rate * td_error
+                q = prev_q + self.get_learning_rate(state, action) * td_error
                 self.q_table[q_index, action] = q
+
+                self.state_action_visits[q_index, action] += 1
                 state = new_state
 
     def plot_rewards(self):
@@ -162,7 +174,7 @@ class QLearning:
 
     def plot_abs_td_errors(self):
         y = self.abs_td_error
-        avg_range = 10
+        avg_range = 1
         avg_error = []
         for i in range(len(y) - avg_range + 1):
             avg_error.append(np.mean(y[i: i + avg_range]))
@@ -202,17 +214,18 @@ class QLearningBountyHunter(QLearning):
         super().__init__(action_space)
         self.learning_rate = 0.8
         self.discount_factor = 0.8
-        self.exploration_rate = 0.1
-        for terminal_state in self.terminal_states:
-            self.r_table[terminal_state] = 0
-        self.terminal_states.clear()
+        self.exploration_rate = 0.3
+        self.r_table[5][9] = 0
         self.hideouts = [[5, 1], [6, 8]]
         self.hideouts_prob = [0.35, 0.65]
         self.thief_pos = self.hideouts[0]
+        self.terminal_states[0] = self.thief_pos  # Replace loot terminal state with thief position
         self.r_table[self.thief_pos[0], self.thief_pos[1]] = 1000
         self.reward_prob[self.hideouts[0][0], self.hideouts[0][1]] = self.hideouts_prob[0]
         self.reward_prob[self.hideouts[1][0], self.hideouts[1][1]] = self.hideouts_prob[1]
-        self.terminal_states.append(self.thief_pos)
+
+    def get_learning_rate(self, state=None, action=None):
+        return 1 / (1 + self.state_action_visits[self.get_q_index(state), action])
 
     def move_thief(self):
         for hideout in self.hideouts:
@@ -236,7 +249,7 @@ class QLearningBountyHunterWithAssistant(QLearningBountyHunter):
 
     def learn(self):
         for episode in range(self.episodes):
-            states = [[0, 0], [9, 0]]
+            states = [[0, 0], [9, 9]]
             actions_made = [[], []]
             states_visited = [[], []]
 
@@ -265,9 +278,10 @@ class QLearningBountyHunterWithAssistant(QLearningBountyHunter):
                 td_error = (reward_prob * reward + movement_cost + self.discount_factor
                             * max(self.q_table[new_q_indexes[0]]) - prev_q)
                 self.abs_td_error[episode] += abs(td_error)
-                q = prev_q + self.learning_rate * td_error
+                q = prev_q + self.get_learning_rate(states[0], actions[0]) * td_error
                 self.q_table[q_indexes[0], actions[0]] = q
 
+                self.state_action_visits[q_indexes[0], actions[0]] += 1
                 states[0] = new_states[0]
 
                 """ ASSISTANT """
@@ -291,9 +305,10 @@ class QLearningBountyHunterWithAssistant(QLearningBountyHunter):
                 td_error = (reward_prob * reward + movement_cost + self.discount_factor
                             * max(self.q_table[new_q_indexes[1]]) - prev_q)
                 self.abs_td_error[episode] += abs(td_error)
-                q = prev_q + self.learning_rate * td_error
+                q = prev_q + self.get_learning_rate(states[1], actions[1]) * td_error
                 self.q_table[q_indexes[1], actions[1]] = q
 
+                self.state_action_visits[q_indexes[1], actions[1]] += 1
                 states[1] = new_states[1]
 
     def transition(self, state, action):
