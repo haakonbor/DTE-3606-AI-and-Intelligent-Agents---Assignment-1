@@ -1,12 +1,13 @@
-import random
 import numpy as np
-import time
+# import time
 import matplotlib.pyplot as plt
 from enum import IntEnum
 
 # np.random.seed(int(time.time()))
-np.random.seed(0)
+np.random.seed(0)  # For reproducing results
 np.set_printoptions(precision=1)
+
+subtask = None
 
 
 class Action(IntEnum):
@@ -22,7 +23,7 @@ class QLearning:
         # Hyper parameters
         self.learning_rate = 0.8
         self.discount_factor = 0.8
-        self.exploration_rate = 0.3
+        self.exploration_rate = 0.1
         self.episodes = 1000
         self.max_steps = 1000
 
@@ -34,6 +35,7 @@ class QLearning:
         self.state_space = 100
         self.action_space = action_space
 
+        # Visits to each state-action pair
         self.state_action_visits = np.zeros((self.state_space, self.action_space))
 
         # R-matrix and Q-table
@@ -55,11 +57,12 @@ class QLearning:
         self.r_table[8][6] -= 100
         self.reward_prob[8][6] = 1
 
+        # Statistics
         self.score = np.zeros(self.episodes)
         self.steps = np.zeros(self.episodes)
         self.abs_td_error = np.zeros(self.episodes)
 
-        self.fig, self.axs = plt.subplots(3)
+        self.fig, self.axs = plt.subplots(2, 2)
         self.x = range(0, self.episodes)
 
     def policy(self, q_index):
@@ -89,6 +92,7 @@ class QLearning:
         elif action == Action.WAIT:
             new_state = state.copy()
 
+        # Blocked actions lead to agent waiting instead
         if new_state[0] < 0 or new_state[0] > 9 or new_state[1] < 0 or new_state[1] > 9 \
                 or new_state in self.blocked_states:
             new_state = state.copy()
@@ -107,8 +111,12 @@ class QLearning:
 
     def learn(self):
         for episode in range(self.episodes):
-            state = [0, 0]
+            # Starting state
+            state = self.terminal_states[0]
+            while state in self.terminal_states or state in self.blocked_states:
+                state = [np.random.choice(9), np.random.choice(9)]
 
+            # For debug purposes
             actions_made = []
             states_visited = []
 
@@ -140,7 +148,8 @@ class QLearning:
                 td_error = (reward_prob * reward + movement_cost + self.discount_factor
                             * max(self.q_table[new_q_index]) - prev_q)
                 self.abs_td_error[episode] += abs(td_error)
-                q = prev_q + self.get_learning_rate(state, action) * td_error
+                learning_rate = self.get_learning_rate(state, action)
+                q = prev_q + learning_rate * td_error
                 self.q_table[q_index, action] = q
 
                 self.state_action_visits[q_index, action] += 1
@@ -154,10 +163,10 @@ class QLearning:
             avg_rewards.append(np.mean(y[i: i + avg_range]))
         for i in range(avg_range - 1):
             avg_rewards.insert(0, np.nan)
-        self.axs[0].plot(self.x, avg_rewards)
-        self.axs[0].set_xlabel('Episodes')
-        self.axs[0].set_ylabel('Score')
-        self.axs[0].set_title(f'Running average score (window = {avg_range})')
+        self.axs[0][0].plot(self.x, avg_rewards)
+        self.axs[0][0].set_xlabel('Episodes')
+        self.axs[0][0].set_ylabel('Score')
+        self.axs[0][0].set_title(f'Rolling average score (window = {avg_range})')
 
     def plot_steps(self):
         y = self.steps
@@ -167,23 +176,44 @@ class QLearning:
             avg_steps.append(np.mean(y[i: i + avg_range]))
         for i in range(avg_range - 1):
             avg_steps.insert(0, np.nan)
-        self.axs[1].plot(self.x, avg_steps)
-        self.axs[1].set_xlabel('Episodes')
-        self.axs[1].set_ylabel('Steps')
-        self.axs[1].set_title(f'Running average steps (window = {avg_range})')
+        self.axs[0][1].plot(self.x, avg_steps)
+        self.axs[0][1].set_xlabel('Episodes')
+        self.axs[0][1].set_ylabel('Steps')
+        self.axs[0][1].set_title(f'Rolling average steps (window = {avg_range})')
 
     def plot_abs_td_errors(self):
         y = self.abs_td_error
-        avg_range = 1
+        avg_range = 10
         avg_error = []
         for i in range(len(y) - avg_range + 1):
             avg_error.append(np.mean(y[i: i + avg_range]))
         for i in range(avg_range - 1):
             avg_error.insert(0, np.nan)
-        self.axs[2].plot(self.x, avg_error)
-        self.axs[2].set_xlabel('Episodes')
-        self.axs[2].set_ylabel('Error')
-        self.axs[2].set_title(f'Running average absolute TD error (window = {avg_range})')
+        self.axs[1][0].plot(self.x, avg_error)
+        self.axs[1][0].set_xlabel('Episodes')
+        self.axs[1][0].set_ylabel('Error')
+        self.axs[1][0].set_title(f'Rolling average absolute TD error (window = {avg_range})')
+
+    def plot_max_q_heatmap(self):
+        max_q = np.zeros((10, 10))
+        row_index = 0
+        col_index = 0
+        for q_values in self.q_table:
+            max_q[row_index][col_index] = max(q_values)
+            col_index += 1
+            if col_index >= 10:
+                col_index = 0
+                row_index += 1
+
+        self.axs[1][1].imshow(max_q)
+        self.axs[1][1].set_xticks(np.arange(10), labels=range(1, 11))
+        self.axs[1][1].set_yticks(np.arange(10), labels=["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"])
+
+        for i in range(10):
+            for j in range(10):
+                self.axs[1][1].text(j, i, "", ha="center", va="center", color="w")
+
+        self.axs[1][1].set_title(f'Heatmap of max Q-values in each state')
 
     def stats(self):
         print("----- MAX Q ------")
@@ -201,9 +231,12 @@ class QLearning:
         self.plot_rewards()
         self.plot_steps()
         self.plot_abs_td_errors()
+        self.plot_max_q_heatmap()
 
-        self.fig.set_size_inches(8, 8)
+        self.fig.set_size_inches(12, 8)
         plt.subplots_adjust(hspace=0.5)
+        plt.suptitle(f'Task {subtask}) with parameters:\n learning rate: {self.learning_rate}, discount factor: '
+                     f'{self.discount_factor}, exploration rate: {self.exploration_rate}')
         plt.show()
 
         return
@@ -214,7 +247,7 @@ class QLearningBountyHunter(QLearning):
         super().__init__(action_space)
         self.learning_rate = 0.8
         self.discount_factor = 0.8
-        self.exploration_rate = 0.3
+        self.exploration_rate = 0.2
         self.r_table[5][9] = 0
         self.hideouts = [[5, 1], [6, 8]]
         self.hideouts_prob = [0.35, 0.65]
@@ -249,7 +282,14 @@ class QLearningBountyHunterWithAssistant(QLearningBountyHunter):
 
     def learn(self):
         for episode in range(self.episodes):
-            states = [[0, 0], [9, 9]]
+            states = [self.terminal_states[0], self.terminal_states[0]]
+
+            while states[0] in self.terminal_states or states[0] in self.blocked_states:
+                states[0] = [np.random.choice(9), np.random.choice(9)]
+
+            while states[1] in self.terminal_states or states[1] in self.blocked_states or states[1] == states[0]:
+                states[1] = [np.random.choice(9), np.random.choice(9)]
+
             actions_made = [[], []]
             states_visited = [[], []]
 
