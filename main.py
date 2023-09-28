@@ -67,6 +67,8 @@ class QLearning:
 
         self.max_q = np.zeros((10, 10))
 
+        self.avg_range = 50
+
         self.fig, self.axs = plt.subplots(2, 2)
         self.x = range(0, self.episodes)
 
@@ -167,66 +169,77 @@ class QLearning:
                     state = new_state
 
     def plot_rewards(self):
-        avg_range = 100
         for run in range(self.runs):
             y = self.score[run]
             avg_rewards = []
-            for i in range(len(y) - avg_range + 1):
-                avg_rewards.append(np.mean(y[i: i + avg_range]))
-            for i in range(avg_range - 1):
+            for i in range(len(y) - self.avg_range + 1):
+                avg_rewards.append(np.mean(y[i: i + self.avg_range]))
+            for i in range(self.avg_range - 1):
                 avg_rewards.insert(0, np.nan)
             self.axs[0][0].plot(self.x, avg_rewards)
 
         self.axs[0][0].set_xlabel('Episodes')
         self.axs[0][0].set_ylabel('Score')
-        self.axs[0][0].set_title(f'Rolling average score (window = {avg_range})')
+        self.axs[0][0].set_title(f'Rolling average score (window = {self.avg_range})')
 
     def plot_steps(self):
-        avg_range = 100
         for run in range(self.runs):
             y = self.steps[run]
             avg_steps = []
-            for i in range(len(y) - avg_range + 1):
-                avg_steps.append(np.mean(y[i: i + avg_range]))
-            for i in range(avg_range - 1):
+            for i in range(len(y) - self.avg_range + 1):
+                avg_steps.append(np.mean(y[i: i + self.avg_range]))
+            for i in range(self.avg_range - 1):
                 avg_steps.insert(0, np.nan)
             self.axs[0][1].plot(self.x, avg_steps)
         self.axs[0][1].set_xlabel('Episodes')
         self.axs[0][1].set_ylabel('Steps')
-        self.axs[0][1].set_title(f'Rolling average steps (window = {avg_range})')
+        self.axs[0][1].set_title(f'Rolling average steps (window = {self.avg_range})')
 
     def plot_abs_td_errors(self):
-        avg_range = 100
         for run in range(self.runs):
             y = self.abs_td_error[run]
             avg_error = []
-            for i in range(len(y) - avg_range + 1):
-                avg_error.append(np.mean(y[i: i + avg_range]))
-            for i in range(avg_range - 1):
+            for i in range(len(y) - self.avg_range + 1):
+                avg_error.append(np.mean(y[i: i + self.avg_range]))
+            for i in range(self.avg_range - 1):
                 avg_error.insert(0, np.nan)
             self.axs[1][0].plot(self.x, avg_error)
         self.axs[1][0].set_xlabel('Episodes')
         self.axs[1][0].set_ylabel('Error')
-        self.axs[1][0].set_title(f'Rolling average absolute TD error (window = {avg_range})')
+        self.axs[1][0].set_title(f'Rolling average absolute TD error (window = {self.avg_range})')
 
     def plot_max_q_heatmap(self):
-        max_q = np.zeros((10, 10))
+        max_q = np.zeros((2, 10, 10))
         row_index = 0
         col_index = 0
         for q_values in self.q_table:
-            max_q[row_index][col_index] = max(q_values)
+            max_q[0][row_index][col_index] = max(q_values)
+            max_q[1][row_index][col_index] = np.argmax(q_values)
             col_index += 1
             if col_index >= 10:
                 col_index = 0
                 row_index += 1
 
-        self.axs[1][1].imshow(max_q)
+        self.axs[1][1].imshow(max_q[0])
         self.axs[1][1].set_xticks(np.arange(10), labels=range(1, 11))
         self.axs[1][1].set_yticks(np.arange(10), labels=["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"])
 
         for i in range(10):
             for j in range(10):
-                self.axs[1][1].text(j, i, "", ha="center", va="center", color="w")
+                action = max_q[1][i][j]
+                text = ""
+                if [i, j] not in self.blocked_states and (self.action_space > 4 or [i, j] not in self.terminal_states):
+                    if action == Action.LEFT:
+                        text = "←"
+                    elif action == Action.UP:
+                        text = "↑"
+                    elif action == Action.RIGHT:
+                        text = "→"
+                    elif action == Action.DOWN:
+                        text = "↓"
+                    else:
+                        text = "-"
+                self.axs[1][1].text(j, i, text, ha="center", va="center", color="w")
 
         self.axs[1][1].set_title(f'Heatmap of max Q-values in each state')
 
