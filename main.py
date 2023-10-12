@@ -263,7 +263,7 @@ class QLearningBountyHunter(QLearning):
         super().__init__(action_space)
         self.learning_rate = 0.8
         self.discount_factor = 0.8
-        self.exploration_rate = 0.2
+        self.exploration_rate = 0.1
         self.r_table[5][9] = 0
         self.hideouts = [[5, 1], [6, 8]]
         self.hideouts_prob = [0.35, 0.65]
